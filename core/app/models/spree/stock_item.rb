@@ -1,11 +1,10 @@
 module Spree
-  class StockItem < Spree::Base
+  class StockItem < Spree.base_class
     acts_as_paranoid
 
-    include Metadata
-    if defined?(Spree::Webhooks::HasWebhooks)
-      include Spree::Webhooks::HasWebhooks
-    end
+    include Spree::Metafields
+    include Spree::Metadata
+    include Spree::StockItem::Webhooks
 
     with_options inverse_of: :stock_items do
       belongs_to :stock_location, class_name: 'Spree::StockLocation'
@@ -95,12 +94,15 @@ module Spree
     end
 
     def conditional_variant_touch
-      # the variant_id changes from nil when a new stock location is added
-      stock_changed = (saved_change_to_count_on_hand? &&
-                        saved_change_to_count_on_hand.any?(&:zero?)) ||
-        saved_change_to_variant_id?
+      variant.touch if !Spree::Config.binary_inventory_cache || stock_changed?
+    end
 
-      variant.touch if !Spree::Config.binary_inventory_cache || stock_changed
+    def stock_changed?
+      # the variant_id changes from nil when a new stock location is added
+      (
+        saved_change_to_count_on_hand? &&
+        saved_change_to_count_on_hand.any?(&:zero?)
+      ) || saved_change_to_variant_id?
     end
   end
 end

@@ -1,3 +1,7 @@
+Rails.application.config.after_initialize do
+  require 'mobility/action_text'
+end
+
 Mobility.configure do |config|
   config.plugins do
     ransack
@@ -12,5 +16,6 @@ Mobility.configure do |config|
     locale_accessors
     presence
     dirty
+    column_fallback
   end
 end

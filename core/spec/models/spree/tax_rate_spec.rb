@@ -176,7 +176,7 @@ describe Spree::TaxRate, type: :model do
 
       before do
         allow(Spree::TaxRate).to receive_messages match: [rate_1, rate_2]
-        allow(shipment).to receive_messages cost: 10.0, tax_category: tax_category_1
+        allow(shipment).to receive_messages cost: 10.0, tax_category: tax_category_1, tax_category_id: tax_category_1.id
       end
 
       it 'applies adjustments for two tax rates to the order' do
@@ -545,6 +545,81 @@ describe Spree::TaxRate, type: :model do
             expect(@price_before_taxes + included_tax).to eq(line_item.total)
           end
         end
+      end
+    end
+  end
+
+  describe '#label' do
+    it 'returns the name and amount for the tax rate' do
+      tax_rate = Spree::TaxRate.new(name: 'Sales Tax', amount: 0.1)
+      expect(tax_rate.send(:label)).to eq('Sales Tax 10%')
+    end
+  end
+
+  describe '#amount_for_label' do
+    it 'returns an empty string when the amount is 0' do
+      tax_rate = Spree::TaxRate.new(amount: 0)
+      expect(tax_rate.send(:amount_for_label)).to eq('')
+    end
+
+    it 'returns a string with the percentage when the amount is not 0' do
+      tax_rate = Spree::TaxRate.new(amount: 0.1)
+      expect(tax_rate.send(:amount_for_label)).to eq(' 10%')
+    end
+  end
+
+  describe 'percentage conversion' do
+    describe '#amount_percentage' do
+      it 'converts decimal amount to percentage' do
+        tax_rate = build(:tax_rate, amount: 0.0825)
+        expect(tax_rate.amount_percentage).to eq(8.25)
+      end
+
+      it 'returns nil when amount is nil' do
+        tax_rate = build(:tax_rate, amount: nil)
+        expect(tax_rate.amount_percentage).to be_nil
+      end
+
+      it 'handles zero amount' do
+        tax_rate = build(:tax_rate, amount: 0.0)
+        expect(tax_rate.amount_percentage).to eq(0.0)
+      end
+
+      it 'rounds to 2 decimal places' do
+        tax_rate = build(:tax_rate, amount: 0.12345)
+        expect(tax_rate.amount_percentage).to eq(12.35)
+      end
+    end
+
+    describe '#amount_percentage=' do
+      it 'converts percentage to decimal amount' do
+        tax_rate = build(:tax_rate)
+        tax_rate.amount_percentage = 8.25
+        expect(tax_rate.amount).to eq(0.0825)
+      end
+
+      it 'sets amount to nil when percentage is nil' do
+        tax_rate = build(:tax_rate)
+        tax_rate.amount_percentage = nil
+        expect(tax_rate.amount).to be_nil
+      end
+
+      it 'sets amount to nil when percentage is empty string' do
+        tax_rate = build(:tax_rate)
+        tax_rate.amount_percentage = ''
+        expect(tax_rate.amount).to be_nil
+      end
+
+      it 'handles zero percentage' do
+        tax_rate = build(:tax_rate)
+        tax_rate.amount_percentage = 0
+        expect(tax_rate.amount).to eq(0.0)
+      end
+
+      it 'handles string percentage values' do
+        tax_rate = build(:tax_rate)
+        tax_rate.amount_percentage = '5.5'
+        expect(tax_rate.amount).to eq(0.055)
       end
     end
   end

@@ -7,7 +7,8 @@ module Spree
       @order = order
     end
 
-    def merge!(other_order, user = nil)
+    def merge!(other_order, user = nil, discard_merged: true)
+      handle_gift_card(other_order)
       other_order.line_items.each do |other_order_line_item|
         next unless other_order_line_item.currency == order.currency
 
@@ -16,12 +17,17 @@ module Spree
       end
 
       set_user(user)
+      clear_addresses(other_order) if discard_merged
       persist_merge
 
-      # So that the destroy doesn't take out line items which may have been re-assigned
-      other_order.line_items.reload
-      other_order.destroy
+      if discard_merged
+        # So that the destroy doesn't take out line items which may have been re-assigned
+        other_order.line_items.reload
+        other_order.destroy
+      end
     end
+
+    private
 
     # Compare the line item of the other order with mine.
     # Make sure you allow any extensions to chime in on whether or
@@ -39,6 +45,11 @@ module Spree
       order.associate_user!(user) if !order.user && !user.blank?
     end
 
+    def clear_addresses(other_order)
+      other_order.ship_address = nil
+      other_order.bill_address = nil
+    end
+
     # The idea is the end developer can choose to override the merge
     # to their own choosing. Default is merge with errors.
     def handle_merge(current_line_item, other_order_line_item)
@@ -46,7 +57,7 @@ module Spree
         current_line_item.quantity += other_order_line_item.quantity
         handle_error(current_line_item) unless current_line_item.save
       else
-        other_order_line_item.order_id = order.id
+        order.line_items << other_order_line_item
         other_order_line_item.adjustments.update_all(order_id: order.id)
         handle_error(other_order_line_item) unless other_order_line_item.save
       end
@@ -58,9 +69,16 @@ module Spree
     end
 
     def persist_merge
-      updater.update_item_count
-      updater.update_item_total
-      updater.persist_totals
+      updater.update
+    end
+
+    def handle_gift_card(other_order)
+      return unless other_order.gift_card.present?
+
+      gift_card = other_order.gift_card
+
+      other_order.remove_gift_card
+      order.apply_gift_card(gift_card)
     end
   end
 end

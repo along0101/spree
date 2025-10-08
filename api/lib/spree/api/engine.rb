@@ -15,20 +15,12 @@ module Spree
       end
 
       initializer 'spree.api.checking_migrations' do
-        Migrations.new(config, engine_name).check
-      end
-
-      def self.activate
-        Dir.glob(File.join(File.dirname(__FILE__), '../../../app/models/spree/api/webhooks/*_decorator*.rb')) do |c|
-          Rails.application.config.cache_classes ? require(c) : load(c)
-        end
+        Migrations.new(config, engine_name).check unless Rails.env.test?
       end
 
       def self.root
         @root ||= Pathname.new(File.expand_path('../../..', __dir__))
       end
-
-      config.to_prepare &method(:activate).to_proc
     end
   end
 end

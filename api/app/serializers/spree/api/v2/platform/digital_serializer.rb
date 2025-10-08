@@ -6,7 +6,6 @@ module Spree
           set_type :digital
 
           attribute :url do |digital|
-            url_helpers = Rails.application.routes.url_helpers
             url_helpers.polymorphic_url(digital.attachment, only_path: true)
           end
 
@@ -22,7 +21,7 @@ module Spree
             digital.attachment.byte_size.to_i
           end
 
-          belongs_to :variant
+          belongs_to :variant, serializer: Spree::Api::Dependencies.platform_variant_serializer.constantize
         end
       end
     end

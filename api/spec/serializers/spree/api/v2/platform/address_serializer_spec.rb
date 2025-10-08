@@ -26,6 +26,9 @@ describe Spree::Api::V2::Platform::AddressSerializer do
             updated_at: address.updated_at,
             deleted_at: address.deleted_at,
             label: address.label,
+            quick_checkout: false,
+            latitude: address.latitude,
+            longitude: address.longitude,
             public_metadata: {},
             private_metadata: {}
           },
@@ -47,6 +50,9 @@ describe Spree::Api::V2::Platform::AddressSerializer do
                 id: address.user.id.to_s,
                 type: :user
               }
+            },
+            metafields: {
+              data: []
             }
           }
         }

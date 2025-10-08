@@ -1,5 +1,5 @@
 module Spree
-  class Order < Spree::Base
+  class Order < Spree.base_class
     module Payments
       extend ActiveSupport::Concern # FIXME: this module is not required to be a concern
       included do
@@ -20,7 +20,7 @@ module Spree
         #   :allow_checkout_on_gateway_error is set to false
         #
         def process_payments!
-          process_payments_with(:process!)
+          with_lock { process_payments_with(:process!) }
         end
 
         def authorize_payments!
@@ -51,22 +51,10 @@ module Spree
             break if payment_total >= total
 
             payment.public_send(method)
-
-            if payment.completed? && payment_total != total_without_pending_store_credits
-              self.payment_total += payment.amount
-            end
           end
         rescue Core::GatewayError => e
           result = !!Spree::Config[:allow_checkout_on_gateway_error]
           errors.add(:base, e.message) && (return result)
-        end
-
-        # Pending store credits are not added to `self.payment_total`.
-        # It can cause a situation where the amount of the credit card payment reduced with store credits
-        # may be added twice to `self.payment_total` causing wrong `order.outstanding_balance`
-        # calculations and thus an incorrect payment state.
-        def total_without_pending_store_credits
-          total - payments.map { |p| p.amount if p.source.is_a?(Spree::StoreCredit) && p.pending? }.sum(&:to_f)
         end
       end
     end

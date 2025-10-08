@@ -1,18 +1,50 @@
 require 'spec_helper'
 
 describe Spree::LegacyUser, type: :model do # rubocop:disable RSpec/MultipleDescribes
+  describe '#can_be_deleted?' do
+    subject { user.can_be_deleted? }
+
+    context 'when user has completed orders' do
+      let(:user) { create(:user, orders: [create(:order, completed_at: Time.current)]) }
+
+      it { is_expected.to be(false) }
+    end
+
+    context 'when user has no completed orders' do
+      let(:user) { create(:user, orders: [create(:order)]) }
+
+      it { is_expected.to be(true) }
+    end
+  end
+
+  describe '#full_name' do
+    context 'when names are present' do
+      let(:user) { create(:user, first_name: 'John', last_name: 'Doe') }
+
+      it 'returns the full name of the user' do
+        expect(user.full_name).to eq('John Doe')
+      end
+    end
+
+    context 'when both first and last names are nil' do
+      let(:user) { create(:user, first_name: nil, last_name: nil) }
+
+      it 'does not raise error and returns nil' do
+        expect { user.full_name }.not_to raise_error
+        expect(user.full_name).to be_nil
+      end
+    end
+  end
+
   # Regression test for #2844 + #3346
   context '#last_incomplete_order' do
     let!(:user) { create(:user) }
-    let!(:order) { create(:order, bill_address: create(:address), ship_address: create(:address)) }
-    let(:store) { create :store }
+    let!(:order) { create(:order, store: store, bill_address: create(:address), ship_address: create(:address)) }
+    let(:store) { @default_store }
 
     let(:order_1) { create(:order, created_at: 1.day.ago, user: user, created_by: user, store: store) }
     let(:order_2) { create(:order, user: user, created_by: user, store: store) }
     let(:order_3) { create(:order, user: user, created_by: create(:user), store: store) }
-
-    it_behaves_like 'metadata', factory: :user
-
     it 'returns correct order' do
       Timecop.scale(3600) do
         order_1
@@ -70,10 +102,12 @@ describe Spree::LegacyUser, type: :model do # rubocop:disable RSpec/MultipleDesc
 end
 
 describe Spree.user_class, type: :model do
+  subject { create(:user) }
+
   context 'reporting' do
     let!(:orders) { create_list(:order, order_count, user: subject, store: store, total: order_value, completed_at: Date.today, currency: currency) }
     let(:currency) { 'USD' }
-    let(:store) { create :store }
+    let(:store) { @default_store }
     let(:order_value) { BigDecimal('80.94') }
     let(:order_count) { 4 }
 
@@ -170,7 +204,7 @@ describe Spree.user_class, type: :model do
     context 'user has several associated store credits' do
       subject { user }
 
-      let!(:store) { create(:store, default: true) }
+      let!(:store) { @default_store }
       let!(:user) { create(:user) }
       let(:amount) { 120.25 }
       let(:additional_amount) { 55.75 }
@@ -227,7 +261,7 @@ describe Spree.user_class, type: :model do
   end
 
   describe '#available_store_credits' do
-    let(:store) { create(:store) }
+    let(:store) { @default_store }
 
     context 'user does not have any associated store credits' do
       subject { create(:user) }

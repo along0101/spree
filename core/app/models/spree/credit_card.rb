@@ -1,7 +1,10 @@
 module Spree
-  class CreditCard < Spree::Base
+  class CreditCard < Spree.base_class
     include ActiveMerchant::Billing::CreditCardMethods
-    include Metadata
+    include Spree::Metafields
+    include Spree::Metadata
+    include Spree::PaymentSourceConcern
+
     if defined?(Spree::Webhooks::HasWebhooks)
       include Spree::Webhooks::HasWebhooks
     end
@@ -12,8 +15,9 @@ module Spree
     acts_as_paranoid
 
     belongs_to :payment_method
-    belongs_to :user, class_name: "::#{Spree.user_class}", foreign_key: 'user_id',
-                      optional: true
+    belongs_to :user, class_name: Spree.user_class.to_s, foreign_key: 'user_id', optional: true
+    belongs_to :gateway_customer, class_name: 'Spree::GatewayCustomer', optional: true
+
     has_many :payments, as: :source
 
     before_save :set_last_digits
@@ -36,6 +40,7 @@ module Spree
     end
 
     scope :with_payment_profile, -> { where.not(gateway_customer_profile_id: nil) }
+    scope :capturable, -> { where.not(gateway_customer_profile_id: nil).or(where.not(gateway_payment_profile_id: nil)) }
     scope :default, -> { where(default: true) }
     scope :not_expired, lambda {
       where('CAST(spree_credit_cards.year AS DECIMAL) > ?', Time.current.year).
@@ -46,6 +51,14 @@ module Spree
 
     # needed for some of the ActiveMerchant gateways (eg. SagePay)
     alias_attribute :brand, :cc_type
+
+    store_accessor :private_metadata, :wallet
+
+    # Returns the type of wallet the card is associated with, eg. "apple_pay", "google_pay", etc.
+    # @return [String]
+    def wallet_type
+      wallet&.[]('type')
+    end
 
     # ActiveMerchant::Billing::CreditCard added this accessor used by some gateways.
     # More info: https://github.com/spree/spree/issues/6209
@@ -99,17 +112,21 @@ module Spree
     def cc_type=(type)
       self[:cc_type] = case type
                        when 'mastercard', 'maestro' then 'master'
-                       when 'amex' then 'american_express'
+                      when 'amex' then 'american_express'
                        when 'dinersclub' then 'diners_club'
                        when '' then try_type_from_number
                        else type
                        end
     end
 
+    alias_method :brand=, :cc_type=
+
     def verification_value=(value)
       @verification_value = value.to_s.gsub(/\s/, '')
     end
 
+    # Returns the last 4 digits of the card number.
+    # @return [String], eg. "4338"
     def set_last_digits
       self.last_digits ||= number.to_s.length <= 4 ? number : number.to_s.slice(-4..-1)
     end
@@ -124,49 +141,35 @@ module Spree
     end
 
     # Show the card number, with all but last 4 numbers replace with "X". (XXXX-XXXX-XXXX-4338)
+    # @return [String]
     def display_number
       "XXXX-XXXX-XXXX-#{last_digits}"
     end
 
+    # Show the card brand, eg. "VISA", "MASTERCARD", etc.
+    # @return [String]
     def display_brand
       brand.present? ? brand.upcase : Spree.t(:no_cc_type)
-    end
-
-    def actions
-      %w{capture void credit}
-    end
-
-    # Indicates whether its possible to capture the payment
-    def can_capture?(payment)
-      payment.pending? || payment.checkout?
-    end
-
-    # Indicates whether its possible to void the payment.
-    def can_void?(payment)
-      !payment.failed? && !payment.void?
-    end
-
-    # Indicates whether its possible to credit the payment.  Note that most gateways require that the
-    # payment be settled first which generally happens within 12-24 hours of the transaction.
-    def can_credit?(payment)
-      payment.completed? && payment.credit_allowed > 0
-    end
-
-    def has_payment_profile?
-      gateway_customer_profile_id.present? || gateway_payment_profile_id.present?
     end
 
     # ActiveMerchant needs first_name/last_name because we pass it a Spree::CreditCard and it calls those methods on it.
     # Looking at the ActiveMerchant source code we should probably be calling #to_active_merchant before passing
     # the object to ActiveMerchant but this should do for now.
+    #
+    # Returns the first name of the cardholder.
+    # @return [String]
     def first_name
       name.to_s.split(/[[:space:]]/, 2)[0]
     end
 
+    # Returns the last name of the cardholder.
+    # @return [String]
     def last_name
       name.to_s.split(/[[:space:]]/, 2)[1]
     end
 
+    # Returns an ActiveMerchant::Billing::CreditCard object.
+    # @return [ActiveMerchant::Billing::CreditCard]
     def to_active_merchant
       ActiveMerchant::Billing::CreditCard.new(
         number: number,

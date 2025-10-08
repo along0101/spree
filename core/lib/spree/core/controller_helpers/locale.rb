@@ -19,6 +19,7 @@ module Spree
         end
 
         def set_locale
+          I18n.default_locale = default_locale unless Spree.always_use_translations?
           I18n.locale = current_locale
         end
 
@@ -26,6 +27,10 @@ module Spree
           return unless respond_to?(:current_store) && current_store.present?
 
           Spree::Locales::SetFallbackLocaleForStore.new.call(store: current_store)
+        end
+
+        def default_locale
+          @default_locale ||= current_store&.default_locale || Rails.application.config.i18n.default_locale || I18n.default_locale
         end
 
         def current_locale
@@ -36,7 +41,7 @@ module Spree
                               elsif config_locale?
                                 config_locale
                               else
-                                current_store&.default_locale || Rails.application.config.i18n.default_locale || I18n.default_locale
+                                default_locale
                               end
         end
 

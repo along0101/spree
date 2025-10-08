@@ -35,6 +35,7 @@ end
 require 'rspec/rails'
 require 'database_cleaner/active_record'
 require 'ffaker'
+require 'shoulda-matchers'
 
 Dir['./spec/support/**/*.rb'].sort.each { |f| require f }
 
@@ -42,17 +43,18 @@ require 'spree/testing_support/i18n' if ENV['CHECK_TRANSLATIONS']
 
 require 'spree/testing_support/factories'
 require 'spree/testing_support/jobs'
+require 'spree/testing_support/store'
 require 'spree/testing_support/metadata'
 require 'spree/testing_support/preferences'
 require 'spree/testing_support/url_helpers'
 require 'spree/testing_support/kernel'
 require 'spree/testing_support/rspec_retry_config'
+require 'spree/testing_support/next_instance_of'
 
 RSpec.configure do |config|
   config.color = true
   config.default_formatter = 'doc'
   config.fail_fast = ENV['FAIL_FAST'] || false
-  config.fixture_path = File.join(__dir__, 'fixtures')
   config.infer_spec_type_from_file_location!
   config.mock_with :rspec
   config.raise_errors_for_deprecations!
@@ -60,14 +62,12 @@ RSpec.configure do |config|
   # If you're not using ActiveRecord, or you'd prefer not to run each of your
   # examples within a transaction, comment the following line or assign false
   # instead of true.
-  config.use_transactional_fixtures = false
+  config.use_transactional_fixtures = true
 
   config.before(:suite) do
     # Clean out the database state before the tests run
     DatabaseCleaner.strategy = :transaction
     DatabaseCleaner.clean_with(:truncation)
-    # Force jobs to be executed in a synchronous way
-    ActiveJob::Base.queue_adapter = :inline
   end
 
   config.around(:each) do |example|
@@ -77,25 +77,21 @@ RSpec.configure do |config|
   end
 
   config.before(:each) do
-    begin
-      Rails.cache.clear
-      reset_spree_preferences
-
-      country = create(:country, name: 'United States of America', iso_name: 'UNITED STATES', iso: 'US', iso3: 'USA', states_required: true)
-      create(:store, default: true, default_country: country, default_currency: 'USD')
-    rescue Errno::ENOTEMPTY
-    end
+    Spree::Webhooks.disabled = true
+    reset_spree_preferences
   end
 
   config.include FactoryBot::Syntax::Methods
   config.include Spree::TestingSupport::Preferences
   config.include Spree::TestingSupport::Kernel
 
-  config.before(:suite) do
-    # Clean out the database state before the tests run
-    DatabaseCleaner.clean_with(:truncation)
-  end
-
   config.order = :random
   Kernel.srand config.seed
+end
+
+Shoulda::Matchers.configure do |config|
+  config.integrate do |with|
+    with.test_framework :rspec
+    with.library :rails
+  end
 end

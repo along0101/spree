@@ -1,6 +1,6 @@
 module Spree
-  class Wishlist < Spree::Base
-    include SingleStoreResource
+  class Wishlist < Spree.base_class
+    include Spree::SingleStoreResource
     if defined?(Spree::Webhooks::HasWebhooks)
       include Spree::Webhooks::HasWebhooks
     end
@@ -15,6 +15,8 @@ module Spree
     belongs_to :store, class_name: 'Spree::Store'
 
     has_many :wished_items, class_name: 'Spree::WishedItem', dependent: :destroy
+    has_many :variants, through: :wished_items, source: :variant, class_name: 'Spree::Variant'
+    has_many :products, -> { distinct }, through: :variants, source: :product, class_name: 'Spree::Product'
 
     after_commit :ensure_default_exists_and_is_unique
     validates :name, :store, :user, presence: true
@@ -25,6 +27,20 @@ module Spree
 
     def to_param
       token
+    end
+
+    # returns the number of wished items in the wishlist
+    #
+    # @return [Integer]
+    def wished_items_count
+      @wished_items_count ||= variant_ids.count
+    end
+
+    # returns the variant ids in the wishlist
+    #
+    # @return [Array<Integer>]
+    def variant_ids
+      @variant_ids ||= wished_items.pluck(:variant_id)
     end
 
     def self.get_by_param(param)

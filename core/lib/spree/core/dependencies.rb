@@ -21,6 +21,7 @@ module Spree
         cart_destroy_service: 'Spree::Cart::Destroy',
         cart_associate_service: 'Spree::Cart::Associate',
         cart_change_currency_service: 'Spree::Cart::ChangeCurrency',
+        cart_remove_out_of_stock_items_service: 'Spree::Cart::RemoveOutOfStockItems',
 
         # checkout
         checkout_next_service: 'Spree::Checkout::Next',
@@ -32,9 +33,15 @@ module Spree
         checkout_get_shipping_rates_service: 'Spree::Checkout::GetShippingRates',
         checkout_select_shipping_method_service: 'Spree::Checkout::SelectShippingMethod',
 
+        # gift cards
+        gift_card_apply_service: 'Spree::GiftCards::Apply',
+        gift_card_remove_service: 'Spree::GiftCards::Remove',
+        gift_card_redeem_service: 'Spree::GiftCards::Redeem',
+
         # order
         order_approve_service: 'Spree::Orders::Approve',
         order_cancel_service: 'Spree::Orders::Cancel',
+        order_updater: 'Spree::OrderUpdater',
 
         # shipment
         shipment_change_state_service: 'Spree::Shipments::ChangeState',
@@ -43,10 +50,14 @@ module Spree
         shipment_add_item_service: 'Spree::Shipments::AddItem',
         shipment_remove_item_service: 'Spree::Shipments::RemoveItem',
 
+        # tracking numbers
+        tracking_number_service: 'Spree::TrackingNumbers::BaseService',
+
         # sorter
         collection_sorter: 'Spree::BaseSorter',
         order_sorter: 'Spree::BaseSorter',
         products_sorter: 'Spree::Products::Sort',
+        posts_sorter: 'Spree::Posts::Sort',
 
         # paginator
         collection_paginator: 'Spree::Shared::Paginate',
@@ -76,9 +87,6 @@ module Spree
 
         payment_create_service: 'Spree::Payments::Create',
 
-        # errors
-        error_handler: 'Spree::ErrorReporter',
-
         # data feeds
         data_feeds_google_rss_service: 'Spree::DataFeeds::Google::Rss',
         data_feeds_google_optional_attributes_service: 'Spree::DataFeeds::Google::OptionalAttributes',
@@ -89,15 +97,17 @@ module Spree
         # finders
         address_finder: 'Spree::Addresses::Find',
         country_finder: 'Spree::Countries::Find',
-        cms_page_finder: 'Spree::CmsPages::Find',
-        menu_finder: 'Spree::Menus::Find',
+        cms_page_finder: 'Spree::CmsPages::Find', # LEGACY
+        menu_finder: 'Spree::Menus::Find', # LEGACY
         current_order_finder: 'Spree::Orders::FindCurrent',
         current_store_finder: 'Spree::Stores::FindCurrent',
         completed_order_finder: 'Spree::Orders::FindComplete',
         credit_card_finder: 'Spree::CreditCards::Find',
         products_finder: 'Spree::Products::Find',
+        posts_finder: 'Spree::Posts::Find',
         taxon_finder: 'Spree::Taxons::Find',
-        line_item_by_variant_finder: 'Spree::LineItems::FindByVariant'
+        line_item_by_variant_finder: 'Spree::LineItems::FindByVariant',
+        variant_finder: 'Spree::Variants::Find'
       }.freeze
 
       include Spree::DependenciesHelper

@@ -11,7 +11,6 @@ module Spree
         has_secure_token :secret_key
       end
 
-
       has_many :events, inverse_of: :subscriber
 
       validates :url, 'spree/url': true, presence: true
@@ -24,6 +23,18 @@ module Spree
       scope :inactive, -> { where(active: false) }
 
       before_save :parse_subscriptions
+
+      def latest_event_at
+        events.order(:created_at).last&.created_at
+      end
+
+      # Returns true if the subscriber supports the given event
+      #
+      # @param event [String] The event to check, e.g. 'product.create'
+      # @return [Boolean]
+      def supports_event?(event)
+        subscriptions.include?(event) || subscriptions.include?('*')
+      end
 
       def self.with_urls_for(event)
         where(
@@ -39,12 +50,20 @@ module Spree
       end
 
       def self.supported_events
-        Spree::Base.descendants.
-          select { |model| model.included_modules.include? Spree::Webhooks::HasWebhooks }.
-          to_h do |model|
-          model_name = model.name.demodulize.underscore.to_sym
-          [model_name, model.supported_webhook_events]
+        @supported_events ||= begin
+          Rails.application.eager_load! if Rails.env.development?
+          Spree::Base.descendants.
+            select { |model| model.included_modules.include? Spree::Webhooks::HasWebhooks }.
+            sort_by { |model| model.name.demodulize.underscore }.
+            to_h do |model|
+              model_name = model.name.demodulize.underscore.to_sym
+              [model_name, model.supported_webhook_events]
+            end
         end
+      end
+
+      def name
+        url
       end
 
       private

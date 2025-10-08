@@ -4,17 +4,19 @@ require 'spree/testing_support/order_walkthrough'
 module Spree
   describe OrderUpdater, type: :model do
     let(:order) { create(:order) }
-    let(:updater) { Spree::OrderUpdater.new(order) }
+    let(:updater) { order.updater }
 
     context 'order totals' do
       before do
         create_list(:line_item, 2, order: order, price: 10)
+        order.reload
+        order.update_with_updater!
       end
 
       it 'updates payment totals' do
-        create(:payment_with_refund, order: order)
-        Spree::OrderUpdater.new(order).update_payment_total
-        expect(order.payment_total).to eq(40.75)
+        create(:payment_with_refund, amount: 20, order: order)
+        order.updater.update_payment_total
+        expect(order.payment_total).to eq(15)
       end
 
       it 'update item total' do
@@ -24,6 +26,7 @@ module Spree
 
       it 'update shipment total' do
         create(:shipment, order: order, cost: 10)
+        order.reload
         updater.update_shipment_total
         expect(order.shipment_total).to eq(10)
       end
@@ -41,6 +44,7 @@ module Spree
           updater.update
           create(:adjustment, source: promotion_action, adjustable: order, order: order)
           create(:line_item, order: order, price: 10) # in addition to the two already created
+          order.reload
           updater.update
         end
 
@@ -105,7 +109,7 @@ module Spree
       end
 
       it 'is partial' do
-        allow(order).to receive_message_chain(:shipments, :states).and_return(['pending', 'ready'])
+        allow(order).to receive_message_chain(:shipments, :states).and_return(['pending', 'shipped'])
         updater.update_shipment_state
         expect(order.shipment_state).to eq('partial')
       end
